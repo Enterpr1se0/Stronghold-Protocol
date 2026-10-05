@@ -1,5 +1,15 @@
 # 更新记录
 
+## 0.1.4 — 2026-10-05
+
+容器化部署。游戏逻辑与 0.1.3 相同，这一版只加发布与部署方式。
+
+### 部署
+
+- 新增 `docker-compose.yml`：`docker compose up -d` 即可起服。默认只读根文件系统、`cap_drop: ALL`、`no-new-privileges` 和 `/tmp` tmpfs；端口与 `SP_COMBAT` / `SP_VERIFY` / `TRUST_PROXY` 都可用环境变量或 `.env` 覆盖（服务器运行期不写自己的文件系统，所以只读根文件系统是安全的）。
+- 新增发布流水线 `.github/workflows/release.yml`：推 `v*` tag 时构建 `linux/amd64` + `linux/arm64` 镜像并发布到 `ghcr.io/sganggs/stronghold-protocol`（标签 `x.y.z` / `x.y` / `latest` / `sha-…`）。推送前先用同一套加固参数起容器打 `GET /healthz`，并校验 tag 与 `package.json` 一致 —— 起不来的镜像不会被发布。
+- 镜像默认不含游戏素材（素材版权原因，见 [NOTICE.md](NOTICE.md)）：运行时用 `-v "$PWD/public/assets:/app/public/assets:ro"` 挂载，或构建时加 `--build-arg FETCH_ASSETS=1`。
+
 ## 0.1.3 — 2026-10-04
 
 修复 0.1.2 发布后玩家和 GitHub 上反馈的问题。每一条先复现，属实的才修，修完经过独立复核再合并。规则对照官方数据和 PRTS 核对；查不到出处的标了推断，详见 [docs/DESIGN.md](docs/DESIGN.md) §23。有意和官方不同的几条写在下面。

@@ -1,0 +1,58 @@
+# 卫戍协议：盟约 · Stronghold Protocol — docker compose（文档：docs/DEPLOY.md §3）
+#
+#   docker compose pull && docker compose up -d   # 用 GHCR 上发布的镜像
+#   docker compose up -d --build                  # 或从当前源码构建
+#   docker compose logs -f                        # 跟随日志（服务器写 stdout，不落盘）
+#   docker compose down
+#
+# 为什么「用发布镜像」要先 pull：本文件同时写了 image 和 build，而 `docker compose up` 在本地没有该镜像时
+# 会**构建**而不是拉取（`--no-build` 这个开关就是为它准备的）。先 pull 把镜像取到本地，up 就不会再去构建。
+#
+# 设置来自环境变量，或本文件同目录下的 .env（两者都不进版本库）：
+#   SP_PORT=8080 SP_VERIFY=sample docker compose up -d
+#
+# 镜像由 .github/workflows/release.yml 在每次推 `v*` tag 时构建并发布（linux/amd64 + linux/arm64）。
+name: stronghold-protocol
+
+services:
+  stronghold:
+    # fork / 改名之后请覆盖：SP_IMAGE=ghcr.io/<owner>/<repo>:latest
+    image: ${SP_IMAGE:-ghcr.io/sganggs/stronghold-protocol:latest}
+    build:
+      context: .
+      args:
+        # 1 = 构建时把游戏素材下载进镜像（约 250 MB；素材是第三方版权，见 NOTICE.md）。
+        FETCH_ASSETS: "${DOCKER_FETCH_ASSETS:-0}"
+    init: true
+    restart: unless-stopped
+    ports:
+      # 左边是宿主机端口（SP_PORT），右边是容器内端口（PORT，与下面的 environment 用同一个变量，不会走岔）。
+      # 只允许本机的反向代理 / 隧道访问时改成 "127.0.0.1:${SP_PORT:-3000}:${PORT:-3000}"；
+      # 代理不在本机时还要设 TRUST_PROXY=1，并确保端口只对代理开放（DEPLOY.md §2.4）。
+      - "${SP_PORT:-3000}:${PORT:-3000}"
+    environment:
+      PORT: "${PORT:-3000}"
+      HOST: "0.0.0.0"
+      SP_COMBAT: "${SP_COMBAT:-client}"
+      # off（默认）：战斗在浏览器里跑，服务器只做合理性校验；sample：抽样复算并记录不一致；
+      # all：每个真人战场都由服务器复算，不一致时以服务器为准（CPU 明显增加，见 DEPLOY.md §1）。
+      SP_VERIFY: "${SP_VERIFY:-off}"
+      TRUST_PROXY: "${TRUST_PROXY:-auto}"
+      # DEBUG: "1"
+    #
+    # 素材：发布镜像里只有占位图。要用宿主机上已准备好的素材，先在宿主机跑一次 `node tools/setup.mjs`，再打开下面这行。
+    # 别提前打开：宿主机上没有该目录时 Docker 会建一个 root 属主的空目录，之后的 setup.mjs 可能写不进去；
+    # 而且若镜像是用 DOCKER_FETCH_ASSETS=1 构建的（素材已在镜像里），空的宿主机目录还会把它盖住。
+    #   - ./public/assets:/app/public/assets:ro
+    # 用 tools/local-extract 提取的本地素材同理（该清单默认不存在，bind mount 会建成目录，所以同样先注释）：
+    #   - ./data/local-assets.json:/app/data/local-assets.json:ro
+    #
+    # 服务器运行期不写自己的文件系统（只读被服务的目录），所以根文件系统可以只读。
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - "no-new-privileges:true"
+    # 继承 Dockerfile 里的 HEALTHCHECK（GET /healthz）。
+    # mem_limit: 1g        # 可选：空闲约 100 MB，每个进行中的对局再加几 MB

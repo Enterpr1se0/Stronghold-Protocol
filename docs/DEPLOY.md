@@ -26,7 +26,7 @@
    ```
    装完**关闭并重新打开**终端，`node -v` 应显示 v22 或更高（winget 的 LTS 目前是 v24.x，同样可用）。没有 winget 时从 <https://nodejs.org/zh-cn/download> 和 <https://git-scm.com/download/win> 下载安装。
 2. 下载，二选一。建议放在一个固定、短、**不在 OneDrive 同步范围内**的目录，例如 `C:\Stronghold-Protocol`：
-   - **完整包（推荐）**：在仓库的 [Releases](https://github.com/sganggs/Stronghold-Protocol/releases) 页面下载最新版本（当前为 v0.1.3）的完整包 zip（已含依赖、前端库和全部素材，包括官方 3D 棋盘），解压后把里面的 `Stronghold-Protocol` 文件夹放到上述位置。不需要 Git，首次启动也不用再下载素材。素材版权归上海鹰角网络 / Yostar，仅限非商业使用，见 [NOTICE.md](../NOTICE.md)。
+   - **完整包（推荐）**：在仓库的 [Releases](https://github.com/sganggs/Stronghold-Protocol/releases) 页面下载最新版本（当前为 v0.1.4）的完整包 zip（已含依赖、前端库和全部素材，包括官方 3D 棋盘），解压后把里面的 `Stronghold-Protocol` 文件夹放到上述位置。不需要 Git，首次启动也不用再下载素材。素材版权归上海鹰角网络 / Yostar，仅限非商业使用，见 [NOTICE.md](../NOTICE.md)。
    - **源码**：
      ```powershell
      git clone https://github.com/sganggs/Stronghold-Protocol.git C:\Stronghold-Protocol
@@ -189,18 +189,20 @@ docker run -d --name stronghold -p 3000:3000 --restart unless-stopped \
 
 镜像基于 `node:22-alpine`，多阶段构建，只含生产依赖；`public/vendor` 在构建时生成。`.dockerignore` 排除了 `public/assets`（不会把宿主机素材打进构建上下文）；`public/fonts`、`data/assets.json` 和 `data/local-assets.json` 若存在会被复制进去。环境变量同 README（`-e SP_VERIFY=sample` 等）。健康检查：`GET /healthz`。
 
-docker compose 示例：
+也可以直接用仓库自带的 `docker-compose.yml`（构建参数、`SP_*` 环境变量、只读根文件系统等都在里面，注释齐全）：
 
-```yaml
-services:
-  stronghold:
-    build:
-      context: .
-      args: { FETCH_ASSETS: "1" }
-    ports: ["3000:3000"]
-    restart: unless-stopped
-    environment:
-      SP_VERIFY: "off"
+```bash
+docker compose pull && docker compose up -d   # 用 GHCR 上发布的镜像
+docker compose up -d --build                  # 或从当前源码构建
+docker compose logs -f                        # 跟随日志（服务器写 stdout，不落盘）
+```
+
+`docker compose up` 在本地没有该镜像时会**构建**而不是拉取（文件里同时写了 `image` 和 `build`），所以要用发布镜像就先 `docker compose pull`。素材默认不在镜像里：先在宿主机跑一次 `node tools/setup.mjs`，再把 `docker-compose.yml` 里那行 `./public/assets` 的挂载取消注释。
+
+每次推 `v*` tag 时 `.github/workflows/release.yml` 会构建并发布镜像（linux/amd64 + linux/arm64）：
+
+```bash
+docker pull ghcr.io/sganggs/stronghold-protocol:latest
 ```
 
 ## 4. macOS / Linux 常驻
