@@ -82,6 +82,9 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
+          # No provenance/SBOM attestation manifest: buildx would push it under the same tag and GHCR lists it
+          # as a bogus `unknown/unknown` platform next to the real amd64 / arm64 images.
+          provenance: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
